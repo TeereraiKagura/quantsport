@@ -39,6 +39,7 @@ python -m quantsport ingest                 # download results and odds, all lea
 python -m quantsport ingest --leagues E0    # one league
 python -m quantsport ingest-fixtures        # upcoming fixtures
 python -m quantsport ingest-openfootball    # upcoming fixtures from public-domain schedules
+python -m quantsport ingest-fixturedownload # upcoming fixtures from fixturedownload.com feeds
 python -m quantsport upcoming               # table of stored live forecasts for upcoming fixtures
 python -m quantsport ingest-csv file.csv --league E0 --season 2025/2026
 python -m quantsport quality-report         # coverage and validation report

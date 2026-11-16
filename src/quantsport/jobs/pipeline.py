@@ -71,6 +71,20 @@ def daily_steps(engine: Engine, session: Session, settings: Settings, today: dat
 
     leagues = list(LEAGUES)
 
+    loaded_by_feed: set[str] = set()
+
+    def fixtures_fixturedownload() -> str:
+        results = ingest.ingest_fixturedownload(session, settings, leagues, today)
+        # "teams_mapped" is present whenever the feed was downloaded and read.
+        loaded_by_feed.update(rep["league"] for _, rep in results if "teams_mapped" in rep)
+        return _openfootball_summary(results)
+
+    def fixtures_openfootball() -> str:
+        # Fallback only: these pre-season files have provisional dates, so they
+        # are not allowed to overwrite a league the maintained feed just answered for.
+        rest = [code for code in leagues if code not in loaded_by_feed]
+        return _openfootball_summary(ingest.ingest_openfootball(session, settings, rest, today))
+
     def predictions() -> str:
         stat = sum(predict_upcoming(engine, session, code, today) for code in leagues)
         ml = predict_upcoming_ml(engine, session, today)
@@ -87,8 +101,8 @@ def daily_steps(engine: Engine, session: Session, settings: Settings, today: dat
         "backup": lambda: f"written {backup_database(settings).name}",
         "historical_data": lambda: _ingest_summary(ingest.ingest_football_data(session, settings, leagues, today)),
         "fixtures_and_odds": lambda: _ingest_summary(ingest.ingest_fixtures(session, settings, leagues, today)),
-        "fixtures_openfootball": lambda: _openfootball_summary(
-            ingest.ingest_openfootball(session, settings, leagues, today)),
+        "fixtures_fixturedownload": fixtures_fixturedownload,
+        "fixtures_openfootball": fixtures_openfootball,
         "predictions": predictions,
         "paper_trading": paper_trading,
     }

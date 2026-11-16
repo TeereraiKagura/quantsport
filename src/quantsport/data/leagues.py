@@ -54,6 +54,13 @@ DATA_SOURCES: dict[str, SourceDef] = {
             "Public domain (CC0). Used for match schedules only; no odds or statistics.",
         ),
         SourceDef(
+            "fixturedownload",
+            "fixturedownload.com",
+            "https://fixturedownload.com",
+            "Fixture feeds collected for personal research; the site's terms were not checked for "
+            "permission to collect by program. Schedules only; not redistributed.",
+        ),
+        SourceDef(
             "csv_upload",
             "User CSV upload",
             None,

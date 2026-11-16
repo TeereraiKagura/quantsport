@@ -1,5 +1,32 @@
 # Data sources and licensing
 
+## Collection policy
+
+Changed by the project owner on 16 November 2026. The original rule was "Do
+not scrape websites in violation of their terms". It no longer applies: this
+is a personal research project, nothing is sold, and collected data is not
+redistributed (raw files and the database are git-ignored).
+
+What still holds, whatever a site's terms say:
+
+- **No bypassing of access controls.** A site that answers with a bot check,
+  a CAPTCHA, a login wall or a paywall is not collected from.
+- **No paid content without paying for it.**
+- **Polite collection.** One request per file or feed per run, a pause
+  between requests, unchanged files not re-processed.
+- **Provenance is unchanged.** Every row still traces to a source and an
+  ingestion run, and nothing is estimated or typed in.
+
+Sites tested on 16 November 2026 with a plain request:
+
+| Site | Wanted for | Result |
+|---|---|---|
+| fixturedownload.com | fixtures | works; now in use (below) |
+| understat.com | xG history | offline ("We will come back soon"); retry later |
+| fbref.com | xG, statistics | bot check; not collected |
+| worldfootball.net | fixtures for Switzerland, Norway | bot check; not collected |
+| sofascore.com API | lineups, statistics | refused (HTTP 403); not collected |
+
 ## In use
 
 ### football-data.co.uk
@@ -70,6 +97,29 @@ python -m quantsport predict-upcoming
 python -m quantsport upcoming
 ```
 
+### fixturedownload.com (fixtures only)
+
+- **What:** one JSON feed per league and season with kick-off times in UTC,
+  kept up to date as matches are rescheduled and played. Used only for
+  upcoming fixtures. No odds, no statistics.
+- **Coverage:** Premier League, La Liga, Bundesliga, Serie A, Eredivisie and
+  the Turkish Super Lig. **Not** Switzerland or Norway.
+- **Terms:** the site publishes these feeds for download; its terms page says
+  nothing either way about collection by program. Collected under the policy
+  above, one request per league per run.
+- **Team names** go through the same spelling-then-schedule verification as
+  the openfootball files.
+- **Date quality:** on 16 November 2026 the feed's date matched the real one
+  on every already-played match in all six leagues (617 matches). The first
+  load corrected the date or time of 20 fixtures that had come from the
+  openfootball files and added 9 Turkish fixtures. In the daily job it runs
+  first, and openfootball is only a fallback for a league this feed failed
+  to load.
+
+```
+python -m quantsport ingest-fixturedownload --days-ahead 8
+```
+
 ### CSV upload
 
 `python -m quantsport ingest-csv <file> --league <code> [--season 2025/2026]`
@@ -84,7 +134,8 @@ Licensing of uploaded data is the uploader's responsibility.
   predictions) on the Advanced plan or an API day pass. The API page refused
   automated access (HTTP 403), so endpoint details and usage terms could not be
   read.
-- QuantSport does not scrape the website. The source is registered but disabled
+- The data pages need a paid plan, so nothing is collected from the website
+  (see the collection policy). The source is registered but disabled
   until `ODDALERTS_API_TOKEN` is set, and the client will be written against
   the documentation available to that account, after its terms on storage and
   reuse are checked.
@@ -101,6 +152,8 @@ No licensed source is connected. The tables exist and are empty. No model may
 assume anything about injuries, suspensions or lineups until a source with
 acceptable terms is added.
 
-### Understat and similar
+### Understat
 
-Not used: there is no official API and access would mean scraping.
+Permitted under the collection policy above, but the site was offline on
+16 November 2026. It is the candidate source for xG history in the Premier
+League, La Liga, Bundesliga and Serie A.

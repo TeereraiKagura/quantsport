@@ -66,8 +66,8 @@ def render(engine: Engine, today: date, days_ahead: int = 10) -> str:
         "of these models was measurably less accurate than the closing bookmaker odds.",
         f"{len(t)} fixtures; {priced} have a stored bookmaker price. Without a price no expected value can be "
         "calculated.",
-        "Fixture dates may come from a pre-season schedule file and can be provisional. "
-        "`ingest-openfootball` reports, per league, how often that file's date matched the real one on matches "
+        "Fixture dates come from schedule feeds and can change. `ingest-fixturedownload` and "
+        "`ingest-openfootball` report, per league, how often the feed's date matched the real one on matches "
         "already played.",
     ]
     return "\n\n".join(head + notes + [_md(t)]) + "\n"

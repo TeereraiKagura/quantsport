@@ -143,3 +143,40 @@ def test_end_to_end_ingestion_stores_scheduled_fixtures(tmp_path, monkeypatch):
         expected = [d for d, _, _ in rows if TODAY <= d <= TODAY + timedelta(days=10)]
         assert len(upcoming) == run.matches_inserted == len(expected) > 0
         assert all(m.kickoff_utc is not None and m.season == "2026/2027" for m in upcoming)
+
+
+def test_fixturedownload_url_and_parse_convert_utc_to_uk_time():
+    from quantsport.data import fixturedownload as fd
+
+    assert fd.url("super-lig", "2026/2027") == "https://fixturedownload.com/feed/json/super-lig-2026"
+    raw = json.dumps([
+        {"DateUtc": "2026-08-15 23:30:00Z", "HomeTeam": "A", "AwayTeam": "B", "HomeTeamScore": 0, "AwayTeamScore": 0},
+        {"DateUtc": "2026-11-21 15:00:00Z", "HomeTeam": "B", "AwayTeam": "A", "HomeTeamScore": None,
+         "AwayTeamScore": None}]).encode()
+    f = fd.parse(raw)
+    assert f.played.tolist() == [True, False]  # a goalless draw is still a played match
+    assert (f.match_date[0], f.time[0]) == (date(2026, 8, 16), "00:30")  # summer: UK is UTC+1, next day
+    assert (f.match_date[1], f.time[1]) == (date(2026, 11, 21), "15:00")  # winter: UK is UTC
+
+
+def test_fixturedownload_end_to_end_ingestion(tmp_path, monkeypatch):
+    from quantsport.data.ingest import ingest_fixturedownload
+
+    engine = make_engine(f"sqlite:///{(tmp_path / 'fd.db').as_posix()}")
+    init_db(engine)
+    rows = schedule()
+    results_csv = "Div,Date,Time,HomeTeam,AwayTeam,FTHG,FTAG,FTR\n" + "".join(
+        f"E0,{d:%d/%m/%Y},15:00,{h},{a},1,0,H\n" for d, h, a in rows if d < TODAY)
+    feed = json.dumps([
+        {"DateUtc": f"{d.isoformat()} 15:00:00Z", "HomeTeam": NAMES[h], "AwayTeam": NAMES[a],
+         "HomeTeamScore": 1 if d < TODAY else None, "AwayTeamScore": 0 if d < TODAY else None}
+        for d, h, a in rows]).encode()
+    monkeypatch.setattr("quantsport.data.sources.fetch", lambda url, settings: feed)
+    with Session(engine) as s:
+        ingest_bytes(s, results_csv.encode(), league=LEAGUES["E0"], source_key="csv_upload", origin="r.csv",
+                     today=TODAY, season_hint="2026/2027")
+        (run, report), (none_run, note) = ingest_fixturedownload(s, config.get_settings(), ["E0", "SWZ"], TODAY)
+        assert none_run is None and note["note"] == "not covered by fixturedownload"
+        assert run.status == "success" and report["teams_unmapped"] == []
+        upcoming = s.scalars(select(Match).where(Match.status == "scheduled")).all()
+        assert len(upcoming) == run.matches_inserted > 0 and all(m.kickoff_utc is not None for m in upcoming)

@@ -250,8 +250,38 @@ def ingest_fixtures(session: Session, settings: Settings, league_codes: list[str
 def ingest_openfootball(
     session: Session, settings: Settings, league_codes: list[str], today: date, days_ahead: int = 10
 ) -> list[tuple[IngestionRun | None, dict]]:
-    """Load upcoming fixtures from the public-domain openfootball files.
+    """Load upcoming fixtures from the public-domain openfootball files."""
+    from quantsport.data import openfootball as of
 
+    files = {code: (of.url(stem, _current_season(code, today)), tz) for code, (stem, tz) in of.LEAGUE_FILES.items()}
+    return _ingest_schedule(session, settings, league_codes, today, days_ahead, "openfootball", files, of.parse)
+
+
+def ingest_fixturedownload(
+    session: Session, settings: Settings, league_codes: list[str], today: date, days_ahead: int = 10
+) -> list[tuple[IngestionRun | None, dict]]:
+    """Load upcoming fixtures from the fixturedownload.com feeds."""
+    from quantsport.data import fixturedownload as fd
+
+    files = {code: (fd.url(feed, _current_season(code, today)), fd.TIMEZONE) for code, feed in fd.LEAGUE_FEEDS.items()}
+    return _ingest_schedule(session, settings, league_codes, today, days_ahead, "fixturedownload", files, fd.parse)
+
+
+def _current_season(code: str, today: date) -> str:
+    from quantsport.data.leagues import season_label, season_start_year
+
+    league = LEAGUES[code]
+    return season_label(league.season_type, season_start_year(league.season_type, today))
+
+
+def _ingest_schedule(
+    session: Session, settings: Settings, league_codes: list[str], today: date, days_ahead: int,
+    source_key: str, files: dict[str, tuple[str, str]], parse,
+) -> list[tuple[IngestionRun | None, dict]]:
+    """Load upcoming fixtures from a schedule source whose team names differ
+    from the stored ones.
+
+    files: league code -> (address, time zone of the parsed kick-off times).
     Returns, per league, the ingestion run (None if nothing could be loaded)
     and a report: mapped and unmapped teams, date agreement on played
     fixtures, and fixtures skipped.
@@ -261,24 +291,22 @@ def ingest_openfootball(
     import pandas as pd
 
     from quantsport.data import openfootball as of
-    from quantsport.data.leagues import season_label, season_start_year
 
     out = []
     for code in league_codes:
-        if code not in of.LEAGUE_FILES:
-            out.append((None, {"league": code, "note": "not covered by openfootball"}))
+        if code not in files:
+            out.append((None, {"league": code, "note": f"not covered by {source_key}"}))
             continue
         league = LEAGUES[code]
-        stem, tz_name = of.LEAGUE_FILES[code]
-        season = season_label(league.season_type, season_start_year(league.season_type, today))
-        address = of.url(stem, season)
+        address, tz_name = files[code]
+        season = _current_season(code, today)
         try:
             raw = sources.fetch(address, settings)
         except Exception as exc:
             log.error("Could not download %s: %s", address, exc)
             out.append((None, {"league": code, "note": f"download failed: {exc}"}))
             continue
-        fixtures = of.parse(raw)
+        fixtures = parse(raw)
         results = pd.read_sql(
             select(Match.match_date, Team.name.label("home"), Match.away_team_id)
             .join(Team, Team.id == Match.home_team_id).join(League, League.id == Match.league_id)
@@ -294,7 +322,7 @@ def ingest_openfootball(
         if body.count(b"\n") <= 1:
             out.append((None, {**report, "note": "no mappable fixtures in the window"}))
             continue
-        run = ingest_bytes(session, body, league=league, source_key="openfootball", origin=address,
+        run = ingest_bytes(session, body, league=league, source_key=source_key, origin=address,
                            today=today, raw_dir=settings.raw_dir)
         out.append((run, report))
     return out

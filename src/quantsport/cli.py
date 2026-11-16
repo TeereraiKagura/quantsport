@@ -39,6 +39,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--leagues", nargs="+", default=list(LEAGUES), choices=list(LEAGUES))
     p.add_argument("--days-ahead", type=int, default=10)
 
+    p = sub.add_parser("ingest-fixturedownload", help="upcoming fixtures from the fixturedownload.com feeds")
+    p.add_argument("--leagues", nargs="+", default=list(LEAGUES), choices=list(LEAGUES))
+    p.add_argument("--days-ahead", type=int, default=10)
+
     p = sub.add_parser("upcoming", help="show stored live forecasts for upcoming fixtures")
     p.add_argument("--days-ahead", type=int, default=10)
 
@@ -112,8 +116,10 @@ def main(argv: list[str] | None = None) -> int:
             _print_runs(ingest.ingest_football_data(session, settings, args.leagues, today, args.seasons_back))
         elif args.command == "ingest-fixtures":
             _print_runs(ingest.ingest_fixtures(session, settings, args.leagues, today))
-        elif args.command == "ingest-openfootball":
-            for run, report in ingest.ingest_openfootball(session, settings, args.leagues, today, args.days_ahead):
+        elif args.command in ("ingest-openfootball", "ingest-fixturedownload"):
+            loader = (ingest.ingest_openfootball if args.command == "ingest-openfootball"
+                      else ingest.ingest_fixturedownload)
+            for run, report in loader(session, settings, args.leagues, today, args.days_ahead):
                 print(report)
                 if run is not None:
                     _print_runs([run])
