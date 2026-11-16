@@ -35,6 +35,13 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("ingest-fixtures", help="download upcoming fixtures")
     p.add_argument("--leagues", nargs="+", default=list(LEAGUES), choices=list(LEAGUES))
 
+    p = sub.add_parser("ingest-openfootball", help="upcoming fixtures from the public-domain openfootball files")
+    p.add_argument("--leagues", nargs="+", default=list(LEAGUES), choices=list(LEAGUES))
+    p.add_argument("--days-ahead", type=int, default=10)
+
+    p = sub.add_parser("upcoming", help="show stored live forecasts for upcoming fixtures")
+    p.add_argument("--days-ahead", type=int, default=10)
+
     p = sub.add_parser("ingest-csv", help="load a local CSV file")
     p.add_argument("path", type=Path)
     p.add_argument("--league", required=True, choices=list(LEAGUES))
@@ -105,6 +112,20 @@ def main(argv: list[str] | None = None) -> int:
             _print_runs(ingest.ingest_football_data(session, settings, args.leagues, today, args.seasons_back))
         elif args.command == "ingest-fixtures":
             _print_runs(ingest.ingest_fixtures(session, settings, args.leagues, today))
+        elif args.command == "ingest-openfootball":
+            for run, report in ingest.ingest_openfootball(session, settings, args.leagues, today, args.days_ahead):
+                print(report)
+                if run is not None:
+                    _print_runs([run])
+        elif args.command == "upcoming":
+            from quantsport.app import upcoming
+
+            text = upcoming.render(engine, today, args.days_ahead)
+            settings.reports_dir.mkdir(parents=True, exist_ok=True)
+            out = settings.reports_dir / f"upcoming_forecasts_{today:%Y%m%d}.md"
+            out.write_text(text, encoding="utf-8")
+            print(text)
+            print(f"Written to {out}")
         elif args.command == "ingest-csv":
             _print_runs([ingest.ingest_csv_file(session, settings, args.path, args.league, today, args.season)])
         elif args.command == "walk-forward":

@@ -42,6 +42,34 @@ Consequences that later phases must respect:
 - Betfair Exchange pre-closing prices are sometimes illiquid; the validator
   flagged 108 such price sets with an implausible booksum.
 
+### openfootball/football.json (fixtures only)
+
+- **What:** public-domain (CC0) season schedules on GitHub, one JSON file per
+  league and season. Used only for upcoming fixtures: who plays whom, and
+  when. No odds, no statistics.
+- **Why:** football-data.co.uk publishes fixtures only a few days ahead, and
+  not at all during international breaks.
+- **Coverage:** Premier League, La Liga, Bundesliga, Serie A, Eredivisie.
+  **Not** the Turkish, Swiss or Norwegian leagues.
+- **Team names** differ from the stored ones. They are matched on spelling and
+  then verified against the schedule: a mapping is kept only if that team's
+  already-played fixtures in the file line up with stored results. Teams that
+  cannot be verified are left unmapped and their fixtures skipped.
+- **Dates can be provisional.** The files are pre-season schedules and are not
+  always updated when matches move for television. Each load reports how
+  often the file's date matched the real one on matches already played; on
+  16 November 2026 that was 100% for the Bundesliga, Serie A and Eredivisie,
+  94% for the Premier League and 85% for La Liga. La Liga fixtures had no
+  kick-off times at all.
+- A fixture loaded from here keeps its identity when football-data.co.uk later
+  supplies the real date, the prices and the result.
+
+```
+python -m quantsport ingest-openfootball --days-ahead 8
+python -m quantsport predict-upcoming
+python -m quantsport upcoming
+```
+
 ### CSV upload
 
 `python -m quantsport ingest-csv <file> --league <code> [--season 2025/2026]`

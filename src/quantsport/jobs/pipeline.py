@@ -54,6 +54,15 @@ def _ingest_summary(runs) -> str:
             f"{counts['failed']} failed; {new} new matches, {updated} updated")
 
 
+def _openfootball_summary(results) -> str:
+    runs = [run for run, _ in results if run is not None]
+    unmapped = sorted({t for _, rep in results for t in rep.get("teams_unmapped", [])})
+    new = sum(r.matches_inserted for r in runs)
+    updated = sum(r.matches_updated for r in runs)
+    return (f"{len(runs)} leagues loaded, {new} new fixtures, {updated} updated; "
+            f"unmapped teams: {', '.join(unmapped) or 'none'}")
+
+
 def daily_steps(engine: Engine, session: Session, settings: Settings, today: date) -> dict[str, Callable[[], str]]:
     from quantsport.jobs.backup import backup_database
     from quantsport.ml.pipeline import predict_upcoming_ml
@@ -78,6 +87,8 @@ def daily_steps(engine: Engine, session: Session, settings: Settings, today: dat
         "backup": lambda: f"written {backup_database(settings).name}",
         "historical_data": lambda: _ingest_summary(ingest.ingest_football_data(session, settings, leagues, today)),
         "fixtures_and_odds": lambda: _ingest_summary(ingest.ingest_fixtures(session, settings, leagues, today)),
+        "fixtures_openfootball": lambda: _openfootball_summary(
+            ingest.ingest_openfootball(session, settings, leagues, today)),
         "predictions": predictions,
         "paper_trading": paper_trading,
     }

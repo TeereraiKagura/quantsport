@@ -57,7 +57,8 @@ def test_job_definitions_cover_every_required_process(db):
     engine, session, settings = db
     daily = pipeline.daily_steps(engine, session, settings, TODAY)
     weekly = pipeline.weekly_steps(engine, session, settings, TODAY)
-    assert list(daily) == ["backup", "historical_data", "fixtures_and_odds", "predictions", "paper_trading"]
+    assert list(daily) == ["backup", "historical_data", "fixtures_and_odds", "fixtures_openfootball",
+                           "predictions", "paper_trading"]
     assert list(weekly) == list(daily) + ["performance_monitoring", "ml_models", "weekly_audit"]
 
 
@@ -72,6 +73,7 @@ def test_daily_job_survives_a_provider_outage(db, monkeypatch):
     assert runs["backup"].status == "ok"
     assert runs["historical_data"].status == "failed" and "downloads failed" in runs["historical_data"].detail
     assert runs["fixtures_and_odds"].status == "failed"
+    assert runs["fixtures_openfootball"].status == "ok" and "0 leagues loaded" in runs["fixtures_openfootball"].detail
     assert runs["predictions"].status == "ok" and runs["predictions"].detail.startswith("0 statistical")
     assert runs["paper_trading"].detail == "no paper portfolios"
 
